@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grip Studio - 방송 준비 프로토타입</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+input, textarea, select, button { font-family: inherit; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef } = React;
+
+const BENEFITS = [
+  {id:"none",label:"없음",icon:"🚫"},{id:"free_ship",label:"무료배송",icon:"🚚"},{id:"must_read",label:"구매전 필독",icon:"📋"},
+  {id:"follow",label:"팔로우 이벤트",icon:"👥"},{id:"purchase",label:"구매 이벤트",icon:"🛒"},{id:"review",label:"리뷰 이벤트",icon:"⭐"},
+  {id:"size",label:"사이즈안내",icon:"📏"},{id:"gift",label:"사은품",icon:"🎁"},{id:"bogo",label:"1+1",icon:"🔥"},
+  {id:"new",label:"신상공개",icon:"✨"},{id:"clearance",label:"재고털이",icon:"💨"},{id:"sameday",label:"당일출고",icon:"⚡"},{id:"dateship",label:"배송일 지정",icon:"📅"},
+];
+const PRODUCTS = [
+  {id:1,name:"그립스튜디오",price:"1,000원",stock:50,img:"📦",flash:true},{id:2,name:"혁수님",price:"3,000,000원",stock:50,img:"👔",flash:true},
+  {id:3,name:"추첨",price:"100,000원",stock:33,img:"🎫",flash:true},{id:4,name:"김치 1키로",price:"49,000원",stock:120,img:"🥬"},
+  {id:5,name:"오버핏 셔츠",price:"5,000원",stock:30,img:"👕"},{id:6,name:"모자",price:"5,000원",stock:1000,img:"🧢"},
+  {id:7,name:"신발",price:"200원",stock:7,img:"👟"},{id:8,name:"선착순게임123",price:"3,000원",stock:1000,img:"🎮",flash:true},
+];
+const THEMES = [
+  {id:"urgent",label:"긴급 타임특가",icon:"🔥",color:"#ef4444",bg:"linear-gradient(135deg,#fef2f2,#fff7ed,#fffbeb)"},
+  {id:"premium",label:"프리미엄 런칭",icon:"💎",color:"#d97706",bg:"linear-gradient(135deg,#fffbeb,#fefce8,#fff7ed)"},
+  {id:"fresh",label:"프레시 & 네이처",icon:"🌿",color:"#16a34a",bg:"linear-gradient(135deg,#f0fdf4,#ecfdf5,#f0fdfa)"},
+  {id:"modern",label:"모던 라이프스타일",icon:"🛋️",color:"#f97316",bg:"linear-gradient(135deg,#fff7ed,#fff1f2,#fdf2f8)"},
+];
+const TAG_PRESETS = [{label:"할인",icon:"🏷️"},{label:"타임어택",icon:"⏰"},{label:"무료배송",icon:"🚚"},{label:"한정수량",icon:"🔥"},{label:"신상품",icon:"✨"},{label:"세트구성",icon:"📦"}];
+const LAYOUTS = ["텍스트 없음","기본형","기본+하이라이트","강조형","기본+강조","강조+기본"];
+const GEN_THUMBS = [
+  {id:"a",label:"시안 A",bg:"linear-gradient(135deg,#16a34a,#22c55e)",title:"뽀송 유기농 탑골러",sub:"지금 바로 시작!"},
+  {id:"b",label:"시안 B",bg:"linear-gradient(135deg,#ef4444,#f97316)",title:"봄맞이 특가 라이브",sub:"최대 70% 할인"},
+  {id:"c",label:"시안 C",bg:"linear-gradient(135deg,#6366f1,#8b5cf6)",title:"프리미엄 신상 런칭",sub:"단독 선공개"},
+  {id:"d",label:"시안 D",bg:"linear-gradient(135deg,#0ea5e9,#06b6d4)",title:"한정수량 타임딜",sub:"오늘만 이 가격!"},
+];
+
+function Section({title,required,badge,children}){return(
+  <div style={{marginBottom:24,background:"#fff",borderRadius:14,border:"1px solid #e8e9ed",padding:"20px 24px"}}>
+    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+      <h3 style={{fontSize:16,fontWeight:700,color:"#1a1a1a",margin:0}}>{title}</h3>
+      {required&&<span style={{fontSize:11,fontWeight:700,color:"#FF3B30"}}>필수</span>}
+      {badge&&<span style={{fontSize:11,fontWeight:600,color:"#6456dc",background:"rgba(100,86,220,.08)",padding:"2px 8px",borderRadius:10}}>{badge}</span>}
+    </div>{children}
+  </div>
+)}
+
+function ConfirmDialog({icon,title,desc,confirmLabel,confirmColor,onConfirm,onCancel}){return(
+  <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={onCancel}>
+    <div onClick={e=>e.stopPropagation()} style={{width:380,background:"#fff",borderRadius:20,padding:"32px 28px 24px",boxShadow:"0 24px 64px rgba(0,0,0,.18)",textAlign:"center"}}>
+      <div style={{fontSize:48,marginBottom:12}}>{icon}</div>
+      <h3 style={{fontSize:20,fontWeight:800,margin:"0 0 8px"}}>{title}</h3>
+      <p style={{fontSize:14,color:"#8b8b8f",margin:"0 0 28px",lineHeight:1.6,whiteSpace:"pre-line"}}>{desc}</p>
+      <div style={{display:"flex",gap:10}}>
+        <button onClick={onCancel} style={{flex:1,padding:"13px 0",borderRadius:10,border:"1px solid #e8e9ed",background:"#fff",fontSize:15,fontWeight:600,color:"#6e6e73",cursor:"pointer"}}>취소</button>
+        <button onClick={onConfirm} style={{flex:1,padding:"13px 0",borderRadius:10,border:"none",background:confirmColor,fontSize:15,fontWeight:700,color:"#fff",cursor:"pointer"}}>{confirmLabel}</button>
+      </div>
+    </div>
+  </div>
+)}
+
+function App(){
+  const [screen,setScreen]=useState("idle");
+  const [isLive,setIsLive]=useState(false);
+  const [broadcastMode,setBroadcastMode]=useState(null);
+  const [title,setTitle]=useState("");
+  const [coverImage,setCoverImage]=useState(null);
+  const [selectedProducts,setSelectedProducts]=useState([]);
+  const [tags,setTags]=useState([]);
+  const [tagInput,setTagInput]=useState("");
+  const [benefit,setBenefit]=useState("none");
+  const [showCoverOpts,setShowCoverOpts]=useState(false);
+  const [showProductPicker,setShowProductPicker]=useState(false);
+  const [confirmType,setConfirmType]=useState(null);
+  const [chatTab,setChatTab]=useState("chat");
+  const [memo,setMemo]=useState("");
+  const [memoShow,setMemoShow]=useState(false);
+  const [nowProductIdx,setNowProductIdx]=useState(0);
+  const [aiScreen,setAiScreen]=useState(null);
+  const [aiTitle,setAiTitle]=useState("");
+  const [aiTags,setAiTags]=useState([]);
+  const [aiTheme,setAiTheme]=useState("urgent");
+  const [genStep,setGenStep]=useState(0);
+  const [genPercent,setGenPercent]=useState(0);
+  const [viewMode,setViewMode]=useState("all");
+  const [editorLayout,setEditorLayout]=useState(1);
+  const [editorVAlign,setEditorVAlign]=useState("중앙");
+  const [editorHAlign,setEditorHAlign]=useState("중앙");
+  const [editorFont,setEditorFont]=useState("Pretendard");
+  const [editorTitleSize,setEditorTitleSize]=useState(100);
+  const [editorPromoSize,setEditorPromoSize]=useState(100);
+  const fileRef=useRef(null);
+
+  const toggleProduct=id=>setSelectedProducts(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);
+  const addTag=()=>{if(tagInput.trim()&&tags.length<10){setTags([...tags,tagInput.trim()]);setTagInput("");}};
+  const canEnter=title&&broadcastMode&&coverImage;
+
+  const startGen=()=>{
+    setAiScreen("generating");setGenStep(0);setGenPercent(0);
+    const steps=[{s:1,p:25,t:1200},{s:2,p:50,t:1000},{s:3,p:75,t:800},{s:4,p:100,t:600}];
+    let i=0;
+    const run=()=>{if(i<steps.length){setGenStep(steps[i].s);setGenPercent(steps[i].p);i++;setTimeout(run,steps[i-1].t);}else{setAiScreen("results");}};
+    setTimeout(run,500);
+  };
+
+  const Sidebar=()=>(
+    <div style={{width:220,minWidth:220,height:"100%",background:"#fff",borderRight:"1px solid #e8e9ed",display:"flex",flexDirection:"column"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,padding:"24px 20px 20px"}}>
+        <div style={{width:34,height:34,borderRadius:10,background:"linear-gradient(135deg,#6456dc,#8B5CF6)",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800,fontSize:14}}>G</div>
+        <div><div style={{fontSize:17,fontWeight:800,letterSpacing:-.5}}>Grip</div><div style={{fontSize:10,color:"#8b8b8f",fontWeight:600,letterSpacing:1.5,marginTop:-2}}>STUDIO</div></div>
+      </div>
+      <nav style={{flex:1,padding:"8px 12px",display:"flex",flexDirection:"column",gap:2}}>
+        <button style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",borderRadius:10,border:"none",fontSize:14,fontWeight:600,cursor:"pointer",background:"rgba(100,86,220,.08)",color:"#6456dc"}}>📊 대시보드</button>
+        <button style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",borderRadius:10,border:"none",fontSize:14,fontWeight:500,cursor:"pointer",background:"transparent",color:"#6e6e73"}}>📝 스크립트</button>
+      </nav>
+      <div style={{padding:"20px 16px",borderTop:"1px solid #e8e9ed"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,padding:6}}>
+          <div style={{width:34,height:34,borderRadius:"50%",background:"rgba(100,86,220,.08)",display:"flex",alignItems:"center",justifyContent:"center",color:"#6456dc",fontWeight:700,fontSize:14}}>예</div>
+          <div><div style={{fontSize:13,fontWeight:600}}>예나사랑나라사랑</div><div style={{fontSize:11,color:"#8b8b8f"}}>Seller</div></div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // AI Input
+  const AiInput=()=>(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setAiScreen(null)}>
+      <div onClick={e=>e.stopPropagation()} style={{width:680,maxHeight:"90vh",overflow:"auto",background:"#f9fafb",borderRadius:20,boxShadow:"0 24px 64px rgba(0,0,0,.2)"}}>
+        <div style={{padding:"32px 40px"}}>
+          <h1 style={{fontSize:28,fontWeight:800,margin:0}}>방송 썸네일</h1>
+          <p style={{fontSize:15,color:"#6b7280",marginTop:10,lineHeight:1.6}}>상품 이미지를 업로드하고 테마를 선택하면 AI가 방송 썸네일과 카피를 자동으로 생성합니다.</p>
+          <div style={{marginTop:32}}>
+            <h3 style={{fontSize:14,fontWeight:600,color:"#404040",marginBottom:12}}>방송 정보</h3>
+            <label style={{fontSize:12,color:"#737373",display:"block",marginBottom:6}}>방송 제목</label>
+            <input value={aiTitle||title} onChange={e=>setAiTitle(e.target.value)} placeholder="봄맞이 특가 라이브" style={{width:"100%",padding:"10px 14px",borderRadius:8,border:"1px solid #e5e5e5",fontSize:14,outline:"none",boxSizing:"border-box",background:"#fff"}} />
+            <div style={{marginTop:16}}>
+              <label style={{fontSize:12,color:"#737373",display:"block",marginBottom:8}}>방송 특징</label>
+              <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+                {TAG_PRESETS.map(t=>(
+                  <button key={t.label} onClick={()=>setAiTags(p=>p.includes(t.label)?p.filter(x=>x!==t.label):[...p,t.label])} style={{padding:"7px 14px",borderRadius:20,border:`1px solid ${aiTags.includes(t.label)?"#2563eb":"#e5e5e5"}`,background:aiTags.includes(t.label)?"#eff6ff":"#fff",cursor:"pointer",fontSize:13,fontWeight:500,color:aiTags.includes(t.label)?"#2563eb":"#525252",display:"flex",alignItems:"center",gap:6}}>
+                    <span>{t.icon}</span>{t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div style={{marginTop:32}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><h3 style={{fontSize:14,fontWeight:600,color:"#404040",margin:0}}>상품 이미지</h3><span style={{fontSize:12,color:"#a3a3a3"}}>0 / 5</span></div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:12}}>
+              <div style={{aspectRatio:"1",borderRadius:12,border:"2px dashed #e5e5e5",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer",background:"#fafafa",gap:4}}>
+                <div style={{width:36,height:36,borderRadius:8,background:"#f5f5f5",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>🖼️</div>
+                <span style={{fontSize:11,color:"#a3a3a3"}}>업로드</span>
+              </div>
+            </div>
+            <p style={{fontSize:12,color:"#a3a3a3",textAlign:"center",marginTop:8}}>드래그 앤 드롭 또는 클릭하여 업로드 (최대 5장)</p>
+          </div>
+          <div style={{marginTop:32}}>
+            <h3 style={{fontSize:14,fontWeight:600,color:"#404040",marginBottom:12}}>테마 선택</h3>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
+              {THEMES.map(th=>(
+                <button key={th.id} onClick={()=>setAiTheme(th.id)} style={{borderRadius:12,border:`2px solid ${aiTheme===th.id?"#2563eb":"#e5e5e5"}`,background:"#fff",cursor:"pointer",overflow:"hidden",textAlign:"left",padding:0,position:"relative",boxShadow:aiTheme===th.id?"0 4px 12px rgba(37,99,235,.15)":"none"}}>
+                  <div style={{aspectRatio:"16/10",background:th.bg}} />
+                  <div style={{padding:"8px 10px",display:"flex",alignItems:"center",gap:6}}><span style={{fontSize:13}}>{th.icon}</span><span style={{fontSize:13,fontWeight:600,color:"#262626"}}>{th.label}</span></div>
+                  <div style={{height:2,background:th.color,opacity:aiTheme===th.id?1:.15}} />
+                  {aiTheme===th.id&&<div style={{position:"absolute",top:6,right:6,width:20,height:20,borderRadius:"50%",background:"#2563eb",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:"#fff",fontSize:11,fontWeight:700}}>✓</span></div>}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{marginTop:32,display:"flex",justifyContent:"center"}}>
+            <button onClick={startGen} style={{width:"100%",maxWidth:320,padding:"14px 0",borderRadius:12,border:"none",background:"#2563eb",color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"}}>썸네일 생성</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // AI Generating
+  const AiGenerating=()=>{
+    const steps=[{l:"상품 분석"},{l:"이미지/카피 생성"},{l:"S3 업로드"},{l:"완료"}];
+    const r=34,c=2*Math.PI*r,off=c-(genPercent/100)*c;
+    return(
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <div style={{width:620,background:"#f9fafb",borderRadius:20,boxShadow:"0 24px 64px rgba(0,0,0,.2)"}}>
+          <div style={{padding:"32px 40px"}}><h1 style={{fontSize:28,fontWeight:800,margin:0}}>방송 썸네일</h1><p style={{fontSize:15,color:"#6b7280",marginTop:10}}>AI가 썸네일을 생성하고 있습니다.</p></div>
+          <div style={{margin:"0 40px 40px",background:"#fff",borderRadius:16,border:"1px solid #e5e7eb",padding:"60px 24px",display:"flex",flexDirection:"column",alignItems:"center"}}>
+            <div style={{position:"relative",width:80,height:80,marginBottom:24}}>
+              <svg width={80} height={80} style={{transform:"rotate(-90deg)"}}><circle cx={40} cy={40} r={r} fill="none" stroke="#f3f4f6" strokeWidth={5}/><circle cx={40} cy={40} r={r} fill="none" stroke="#2563eb" strokeWidth={5} strokeLinecap="round" strokeDasharray={c} strokeDashoffset={off} style={{transition:"all .7s ease-out"}}/></svg>
+              <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:18,fontWeight:700,color:"#2563eb"}}>{genPercent}%</span></div>
+            </div>
+            <h3 style={{fontSize:20,fontWeight:600,marginBottom:4}}>{genStep<=1?"상품 이미지를 분석하고 있습니다...":genStep===2?"이미지와 카피를 생성 중...":genStep===3?"업로드 중...":"완료!"}</h3>
+            <p style={{fontSize:14,color:"#9ca3af",marginBottom:32}}>Step {Math.min(genStep||1,4)} / 4</p>
+            <div style={{width:"100%",maxWidth:400,display:"flex",flexDirection:"column",gap:8}}>
+              {steps.map((s,i)=>{const active=genStep===i+1,done=genStep>i+1;return(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 16px",borderRadius:12,background:active?"#eff6ff":"transparent",border:active?"1px solid #bfdbfe":"1px solid transparent",opacity:active||done?1:.4}}>
+                  <div style={{width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center"}}>{done?<span style={{color:"#16a34a",fontSize:16}}>✓</span>:active?<span style={{display:"inline-block",width:20,height:20,border:"2px solid #2563eb",borderTopColor:"transparent",borderRadius:"50%",animation:"spin 1s linear infinite"}}></span>:<div style={{width:8,height:8,borderRadius:"50%",background:"#d1d5db"}}/>}</div>
+                  <span style={{fontSize:14,fontWeight:active||done?600:500,color:active?"#1d4ed8":done?"#1a1a1a":"#6b7280"}}>{s.l}</span>
+                  {active&&<span style={{marginLeft:"auto",fontSize:12,fontWeight:600,color:"#2563eb"}}>진행 중...</span>}
+                  {done&&<span style={{marginLeft:"auto",fontSize:12,fontWeight:600,color:"#16a34a"}}>완료</span>}
+                </div>
+              );})}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // AI Results
+  const AiResults=()=>(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{width:900,maxHeight:"92vh",background:"#f9fafb",borderRadius:20,boxShadow:"0 24px 64px rgba(0,0,0,.2)",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        <div style={{padding:"24px 32px 0"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+            <div><h1 style={{fontSize:28,fontWeight:800,margin:0}}>방송 썸네일</h1><p style={{fontSize:14,color:"#6b7280",marginTop:6}}>생성된 시안을 확인하고 편집하세요.</p></div>
+            <button onClick={()=>setAiScreen("input")} style={{padding:"6px 12px",borderRadius:6,border:"1px solid #e5e7eb",background:"#fff",fontSize:13,fontWeight:500,cursor:"pointer",color:"#4b5563",flexShrink:0}}>🔄 새 세션</button>
+          </div>
+        </div>
+        <div style={{position:"sticky",top:0,background:"rgba(255,255,255,.8)",backdropFilter:"blur(12px)",borderBottom:"1px solid #f3f4f6",padding:"0 32px",marginTop:16}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",height:48}}>
+            <div style={{display:"flex",alignItems:"center",gap:4}}>
+              {["all","a","b","c","d"].map(v=>(<button key={v} onClick={()=>setViewMode(v)} style={{padding:"6px 14px",borderRadius:8,border:"none",fontSize:13,fontWeight:600,cursor:"pointer",background:viewMode===v?"#111827":"transparent",color:viewMode===v?"#fff":"#6b7280"}}>{v==="all"?"전체 보기":`시안 ${v.toUpperCase()}`}</button>))}
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>setAiScreen("input")} style={{padding:"7px 14px",borderRadius:8,border:"none",background:"#f3f4f6",fontSize:12,fontWeight:600,color:"#4b5563",cursor:"pointer"}}>🔄 다시 생성</button>
+              <button onClick={()=>{setCoverImage("ai");setAiScreen(null);}} style={{padding:"7px 14px",borderRadius:8,border:"none",background:"#2563eb",fontSize:12,fontWeight:600,color:"#fff",cursor:"pointer"}}>⬇️ 적용하기</button>
+            </div>
+          </div>
+        </div>
+        <div style={{flex:1,overflow:"auto",padding:"24px 32px 32px"}}>
+          {viewMode==="all"?(
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,maxWidth:700,margin:"0 auto"}}>
+              {GEN_THUMBS.map(t=>(
+                <button key={t.id} onClick={()=>setViewMode(t.id)} style={{position:"relative",borderRadius:16,overflow:"hidden",border:"2px solid transparent",cursor:"pointer",background:"#f3f4f6",textAlign:"left",padding:0}}>
+                  <div style={{aspectRatio:"1",background:t.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24}}>
+                    <div style={{fontSize:20,fontWeight:800,color:"#fff",textShadow:"0 2px 8px rgba(0,0,0,.3)",textAlign:"center"}}>{t.title}</div>
+                    <div style={{fontSize:14,color:"rgba(255,255,255,.85)",marginTop:6}}>{t.sub}</div>
+                  </div>
+                  <div style={{position:"absolute",top:10,left:10,padding:"4px 10px",borderRadius:8,background:"rgba(0,0,0,.5)",fontSize:12,fontWeight:600,color:"#fff"}}>시안 {t.id.toUpperCase()}</div>
+                </button>
+              ))}
+            </div>
+          ):(
+            <div style={{display:"flex",gap:24}}>
+              <div style={{flex:1,minWidth:0}}>
+                {(()=>{const t=GEN_THUMBS.find(x=>x.id===viewMode);return t&&(
+                  <div style={{borderRadius:16,overflow:"hidden",background:t.bg,aspectRatio:"1",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:32}}>
+                    <div style={{fontSize:24,fontWeight:800,color:"#fff",textShadow:"0 2px 8px rgba(0,0,0,.3)",textAlign:"center"}}>{t.title}</div>
+                    <div style={{fontSize:16,color:"rgba(255,255,255,.85)",marginTop:8}}>{t.sub}</div>
+                  </div>
+                );})()}
+                <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:12}}>
+                  {["더 밝게","배경 단순하게","색감 따뜻하게","대비 강하게","그림자 부드럽게"].map(c=>(<span key={c} style={{padding:"6px 12px",borderRadius:20,border:"1px solid #e5e7eb",background:"#fff",fontSize:12,fontWeight:500,color:"#4b5563",cursor:"pointer"}}>✨ {c}</span>))}
+                </div>
+                <input placeholder="이미지를 어떻게 바꿀까요?" style={{width:"100%",marginTop:8,padding:"10px 14px",borderRadius:8,border:"1px solid #e5e7eb",fontSize:13,outline:"none",boxSizing:"border-box"}} />
+              </div>
+              <div style={{width:260,flexShrink:0,display:"flex",flexDirection:"column",gap:14}}>
+                <div><div style={{fontSize:12,color:"#737373",marginBottom:8}}>레이아웃</div><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:4}}>{LAYOUTS.map((l,i)=>(<button key={i} onClick={()=>setEditorLayout(i)} style={{padding:"6px 4px",borderRadius:6,border:`1.5px solid ${editorLayout===i?"#2563eb":"#e5e7eb"}`,background:editorLayout===i?"#eff6ff":"#fff",cursor:"pointer",fontSize:10,fontWeight:500,color:editorLayout===i?"#2563eb":"#737373"}}>{l}</button>))}</div></div>
+                <div><div style={{fontSize:12,color:"#737373",marginBottom:8}}>수직 위치</div><div style={{display:"flex",gap:4}}>{["상단","중앙","하단"].map(v=>(<button key={v} onClick={()=>setEditorVAlign(v)} style={{flex:1,padding:"7px 0",borderRadius:6,border:`1.5px solid ${editorVAlign===v?"#2563eb":"#e5e7eb"}`,background:editorVAlign===v?"#eff6ff":"#fff",cursor:"pointer",fontSize:12,fontWeight:500,color:editorVAlign===v?"#2563eb":"#737373"}}>{v}</button>))}</div></div>
+                <div><div style={{fontSize:12,color:"#737373",marginBottom:8}}>수평 정렬</div><div style={{display:"flex",gap:4}}>{["좌측","중앙","우측"].map(v=>(<button key={v} onClick={()=>setEditorHAlign(v)} style={{flex:1,padding:"7px 0",borderRadius:6,border:`1.5px solid ${editorHAlign===v?"#2563eb":"#e5e7eb"}`,background:editorHAlign===v?"#eff6ff":"#fff",cursor:"pointer",fontSize:12,fontWeight:500,color:editorHAlign===v?"#2563eb":"#737373"}}>{v}</button>))}</div></div>
+                <div><div style={{fontSize:12,color:"#737373",marginBottom:6}}>폰트</div><select value={editorFont} onChange={e=>setEditorFont(e.target.value)} style={{width:"100%",padding:"7px 10px",borderRadius:6,border:"1px solid #e5e7eb",fontSize:12,outline:"none"}}><option>Pretendard</option><option>Noto Sans KR</option></select></div>
+                <div><div style={{fontSize:12,color:"#737373",marginBottom:6}}>폰트 크기</div>
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}><span style={{fontSize:11,color:"#737373",width:42}}>타이틀</span><input type="range" min={50} max={150} value={editorTitleSize} onChange={e=>setEditorTitleSize(+e.target.value)} style={{flex:1}}/><span style={{fontSize:11,width:32,textAlign:"right"}}>{editorTitleSize}%</span></div>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}><span style={{fontSize:11,color:"#737373",width:42}}>프로모션</span><input type="range" min={50} max={150} value={editorPromoSize} onChange={e=>setEditorPromoSize(+e.target.value)} style={{flex:1}}/><span style={{fontSize:11,width:32,textAlign:"right"}}>{editorPromoSize}%</span></div>
+                </div>
+                <div><div style={{fontSize:12,color:"#737373",marginBottom:6}}>텍스트 색상</div>
+                  {[{l:"타이틀",c:"#4CAF50"},{l:"프로모션",c:"#FFF"},{l:"강조 문구",c:"#4CAF50"},{l:"블록 배경",c:"#FF2055"},{l:"블록 글자",c:"#FFF"}].map((x,i)=>(<div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:3}}><span style={{fontSize:11,color:"#737373"}}>{x.l}</span><div style={{display:"flex",alignItems:"center",gap:4,padding:"3px 8px",borderRadius:4,border:"1px solid #e5e7eb",background:"#fff"}}><div style={{width:12,height:12,borderRadius:2,background:x.c,border:"1px solid rgba(0,0,0,.1)"}}/><span style={{fontSize:10,fontFamily:"monospace",color:"#737373"}}>{x.c}</span></div></div>))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  // IDLE
+  const Idle=()=>(
+    <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"#f7f8fa",gap:32}}>
+      <div style={{textAlign:"center"}}><div style={{fontSize:64,marginBottom:16}}>📡</div><h2 style={{fontSize:24,fontWeight:700,margin:0}}>방송을 준비해보세요</h2><p style={{fontSize:15,color:"#8b8b8f",marginTop:8}}>라이브, 녹화, 연습 모드를 선택하고 방송 정보를 미리 세팅하세요</p></div>
+      <button onClick={()=>setScreen("prepare")} style={{padding:"16px 48px",borderRadius:12,border:"none",cursor:"pointer",background:"linear-gradient(135deg,#6456dc,#8B5CF6)",color:"#fff",fontSize:18,fontWeight:700,boxShadow:"0 4px 20px rgba(100,86,220,.3)"}}>🎬 방송 준비하기</button>
+    </div>
+  );
+
+  // PREPARE
+  const Prepare=()=>(
+    <div style={{flex:1,background:"#f7f8fa",overflow:"auto"}}>
+      <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={()=>setCoverImage("upload")} />
+      <div style={{maxWidth:800,margin:"0 auto",padding:"32px 24px"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:28}}>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <button onClick={()=>setScreen("idle")} style={{background:"#fff",border:"1px solid #e8e9ed",borderRadius:8,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:16}}>←</button>
+            <h1 style={{fontSize:22,fontWeight:700,margin:0}}>방송 준비</h1>
+          </div>
+          <button onClick={()=>setScreen("dashboard")} disabled={!canEnter} style={{padding:"10px 24px",borderRadius:8,border:"none",cursor:canEnter?"pointer":"not-allowed",background:canEnter?"linear-gradient(135deg,#6456dc,#8B5CF6)":"#d1d1d6",color:"#fff",fontSize:14,fontWeight:700}}>대시보드 입장</button>
+        </div>
+
+        <Section title="방송 모드" required>
+          <div style={{display:"flex",gap:12}}>
+            {[{id:"live",icon:"🔴",l:"라이브",c:"#FF3B30"},{id:"record",icon:"🎥",l:"녹화",c:"#FF9500"},{id:"practice",icon:"🧪",l:"연습하기",c:"#34C759"}].map(m=>(
+              <button key={m.id} onClick={()=>setBroadcastMode(m.id)} style={{flex:1,padding:20,borderRadius:12,border:`2px solid ${broadcastMode===m.id?m.c:"#e8e9ed"}`,background:broadcastMode===m.id?`${m.c}08`:"#fff",cursor:"pointer",textAlign:"center"}}>
+                <div style={{fontSize:32}}>{m.icon}</div><div style={{fontSize:15,fontWeight:700,marginTop:8}}>{m.l}</div>
+              </button>
+            ))}
+          </div>
+        </Section>
+
+        <Section title="방송 커버 이미지" required>
+          {!coverImage?(
+            <div style={{position:"relative"}}>
+              <button onClick={()=>setShowCoverOpts(!showCoverOpts)} style={{width:"100%",height:160,borderRadius:12,border:"2px dashed #d1d1d6",background:"#fafafa",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8}}>
+                <span style={{fontSize:36}}>📸</span><span style={{fontSize:14,fontWeight:600,color:"#6e6e73"}}>커버 이미지 등록</span>
+              </button>
+              {showCoverOpts&&(
+                <div style={{position:"absolute",top:"100%",left:"50%",transform:"translateX(-50%)",marginTop:8,background:"#fff",borderRadius:12,boxShadow:"0 8px 32px rgba(0,0,0,.12)",border:"1px solid #e8e9ed",zIndex:10,minWidth:240,overflow:"hidden"}}>
+                  <button onClick={()=>{setShowCoverOpts(false);fileRef.current?.click();}} style={{width:"100%",padding:"14px 20px",border:"none",background:"transparent",cursor:"pointer",display:"flex",alignItems:"center",gap:12,fontSize:14,fontWeight:500,borderBottom:"1px solid #f0f0f0"}}>🖼️ 업로드</button>
+                  <button onClick={()=>{setShowCoverOpts(false);setAiScreen("input");}} style={{width:"100%",padding:"14px 20px",border:"none",background:"transparent",cursor:"pointer",display:"flex",alignItems:"center",gap:12,fontSize:14,color:"#2563eb",fontWeight:700}}>✨ AI 썸네일 만들기 <span style={{marginLeft:"auto",fontSize:10,fontWeight:700,color:"#fff",background:"#2563eb",padding:"3px 8px",borderRadius:10}}>NEW</span></button>
+                </div>
+              )}
+            </div>
+          ):(
+            <div>
+              <div style={{width:"100%",height:200,borderRadius:12,background:coverImage==="ai"?(THEMES.find(t=>t.id===aiTheme)?.bg||"#e8e9ed"):"#e8e9ed",display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
+                {coverImage==="ai"?<div style={{textAlign:"center"}}><div style={{fontSize:16,fontWeight:700}}>{aiTitle||title}</div><div style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,.5)",padding:"4px 8px",borderRadius:6,fontSize:10,color:"#fff"}}>AI 생성</div></div>:<span style={{fontSize:48}}>🖼️</span>}
+              </div>
+              <button onClick={()=>{setCoverImage(null);fileRef.current?.click();}} style={{width:"100%",marginTop:8,padding:"10px 0",borderRadius:8,border:"1px solid #e8e9ed",background:"#fff",cursor:"pointer",fontSize:13,fontWeight:600,color:"#6e6e73"}}>🔄 다시 선택</button>
+            </div>
+          )}
+        </Section>
+
+        <Section title="방송 제목" required>
+          <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="방송 제목 (최대 40자)" maxLength={40} style={{width:"100%",padding:"12px 16px",borderRadius:8,border:"1px solid #e8e9ed",fontSize:15,outline:"none",boxSizing:"border-box",background:"#fafafa"}} />
+          <div style={{textAlign:"right",fontSize:12,color:"#8b8b8f",marginTop:4}}>{title.length}/40</div>
+        </Section>
+
+        <Section title="판매 상품" badge={`${selectedProducts.length}개`}>
+          <button onClick={()=>setShowProductPicker(true)} style={{width:"100%",padding:"12px",borderRadius:8,border:"1px dashed #d1d1d6",background:"#fafafa",cursor:"pointer",fontSize:14,color:"#6e6e73"}}>🛍️ 상품 선택</button>
+          {selectedProducts.length>0&&<div style={{display:"flex",flexDirection:"column",gap:6,marginTop:10}}>{selectedProducts.map(pid=>{const p=PRODUCTS.find(x=>x.id===pid);return(<div key={pid} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderRadius:8,background:"#fff",border:"1px solid #e8e9ed"}}><span style={{fontSize:22}}>{p.img}</span><div style={{flex:1}}><div style={{fontSize:13,fontWeight:600}}>{p.name}</div><div style={{fontSize:12,color:"#6e6e73"}}>{p.price}</div></div><button onClick={()=>toggleProduct(pid)} style={{background:"none",border:"none",cursor:"pointer",color:"#d1d1d6"}}>✕</button></div>);})}</div>}
+        </Section>
+
+        <Section title="태그" badge={`${tags.length}/10`}>
+          <div style={{display:"flex",gap:8}}><input value={tagInput} onChange={e=>setTagInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTag()} placeholder="태그 입력 후 Enter" style={{flex:1,padding:"10px 14px",borderRadius:8,border:"1px solid #e8e9ed",fontSize:14,outline:"none",background:"#fafafa"}} /><button onClick={addTag} style={{padding:"10px 18px",borderRadius:8,border:"none",background:"#6456dc",color:"#fff",fontWeight:600,cursor:"pointer"}}>추가</button></div>
+          {tags.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:10}}>{tags.map((t,i)=><span key={i} style={{padding:"5px 10px",borderRadius:20,background:"rgba(100,86,220,.08)",fontSize:13,color:"#6456dc",fontWeight:500}}>#{t} <button onClick={()=>setTags(tags.filter((_,idx)=>idx!==i))} style={{background:"none",border:"none",cursor:"pointer",color:"#6456dc",padding:0,marginLeft:4}}>✕</button></span>)}</div>}
+        </Section>
+
+        <Section title="혜택" badge="추천">
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{BENEFITS.map(b=>(<button key={b.id} onClick={()=>setBenefit(b.id)} style={{padding:"7px 12px",borderRadius:20,border:`1.5px solid ${benefit===b.id?"#6456dc":"#e8e9ed"}`,background:benefit===b.id?"rgba(100,86,220,.08)":"#fff",cursor:"pointer",fontSize:12,fontWeight:benefit===b.id?600:400,color:benefit===b.id?"#6456dc":"#6e6e73"}}>{b.icon} {b.label}</button>))}</div>
+        </Section>
+
+        <button onClick={()=>setScreen("dashboard")} disabled={!canEnter} style={{width:"100%",padding:"16px 0",borderRadius:12,border:"none",background:canEnter?"linear-gradient(135deg,#6456dc,#8B5CF6)":"#d1d1d6",color:"#fff",fontSize:16,fontWeight:700,cursor:canEnter?"pointer":"not-allowed",marginBottom:8}}>대시보드 입장 →</button>
+        {!canEnter&&<p style={{textAlign:"center",fontSize:12,color:"#FF3B30"}}>방송 모드, 커버 이미지, 제목은 필수입니다</p>}
+      </div>
+
+      {showProductPicker&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setShowProductPicker(false)}>
+          <div onClick={e=>e.stopPropagation()} style={{width:460,maxHeight:"75vh",overflow:"auto",background:"#fff",borderRadius:20,padding:24}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}><h3 style={{fontSize:18,fontWeight:700,margin:0}}>상품 선택</h3><button onClick={()=>setShowProductPicker(false)} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:"#8b8b8f"}}>✕</button></div>
+            {PRODUCTS.map(p=>(<button key={p.id} onClick={()=>toggleProduct(p.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:8,border:`1.5px solid ${selectedProducts.includes(p.id)?"#6456dc":"#e8e9ed"}`,background:selectedProducts.includes(p.id)?"rgba(100,86,220,.04)":"#fff",cursor:"pointer",width:"100%",textAlign:"left",marginBottom:6}}><span style={{fontSize:24}}>{p.img}</span><div style={{flex:1}}><div style={{fontSize:14,fontWeight:600}}>{p.name}</div><div style={{fontSize:12,color:"#6e6e73"}}>{p.price}</div></div><div style={{width:20,height:20,borderRadius:5,border:`2px solid ${selectedProducts.includes(p.id)?"#6456dc":"#d1d1d6"}`,background:selectedProducts.includes(p.id)?"#6456dc":"#fff",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:11}}>{selectedProducts.includes(p.id)&&"✓"}</div></button>))}
+            <button onClick={()=>setShowProductPicker(false)} style={{width:"100%",marginTop:12,padding:"12px 0",borderRadius:10,border:"none",background:"#6456dc",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>{selectedProducts.length}개 선택 완료</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // DASHBOARD (simplified for file size)
+  const Dashboard=()=>{
+    const ml=broadcastMode==="live"?"라이브":broadcastMode==="record"?"녹화":"연습";
+    const mc=broadcastMode==="live"?"#FF3B30":broadcastMode==="record"?"#FF9500":"#34C759";
+    return(
+      <div style={{flex:1,display:"flex",flexDirection:"column",background:"#f7f8fa",overflow:"hidden"}}>
+        <div style={{flex:1,display:"flex",gap:12,padding:12,minHeight:0}}>
+          <div style={{width:320,background:"#fff",borderRadius:12,border:"1px solid #e8e9ed",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+            <div style={{padding:"16px 16px 8px"}}><div style={{fontSize:18,fontWeight:700}}>{title}</div><div style={{fontFamily:"monospace",fontSize:16,fontWeight:700,color:isLive?mc:"#8b8b8f",marginTop:4}}>{isLive?"● 02:04:11":"○ 00:00:00"}</div></div>
+            <div style={{flex:1,background:"#1a1a1a",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{textAlign:"center",color:"#fff"}}>{isLive?<div><div style={{display:"inline-block",padding:"4px 12px",borderRadius:16,background:mc,fontSize:12,fontWeight:700,marginBottom:8}}>{ml} 중</div></div>:<div><div style={{fontSize:32,marginBottom:8}}>📱</div><div style={{fontSize:14}}>방송 대기 중</div></div>}</div></div>
+            <div style={{padding:12,borderTop:"1px solid #e8e9ed"}}>{!isLive?<button onClick={()=>setConfirmType("start")} style={{width:"100%",padding:"12px 0",borderRadius:10,border:"none",background:mc,color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>{ml} 시작</button>:<button onClick={()=>setConfirmType("end")} style={{width:"100%",padding:"12px 0",borderRadius:10,border:"2px solid #FF3B30",background:"#fff",color:"#FF3B30",fontSize:14,fontWeight:700,cursor:"pointer"}}>⏹️ 방송 종료</button>}</div>
+          </div>
+          <div style={{flex:1,display:"flex",flexDirection:"column",gap:12,minWidth:0}}>
+            <div style={{background:"#fff",borderRadius:12,border:"1px solid #e8e9ed",padding:16}}>
+              <div style={{fontSize:16,fontWeight:600,marginBottom:10}}>실시간 판매 성과</div>
+              <div style={{display:"flex",gap:8}}>{[{l:"실시간 접속",v:isLive?"3":"0"},{l:"누적 접속",v:isLive?"18":"0"},{l:"주문 금액",v:"0원"},{l:"장바구니",v:isLive?"14":"0"}].map((s,i)=>(<div key={i} style={{flex:1,background:"#f7f8fa",borderRadius:8,padding:10}}><div style={{fontSize:11,color:"#8b8b8f"}}>{s.l}</div><div style={{fontSize:14,fontWeight:700,marginTop:2}}>{s.v}</div></div>))}</div>
+            </div>
+            <div style={{flex:1,display:"flex",gap:12,minHeight:0}}>
+              <div style={{flex:1,background:"#fff",borderRadius:12,border:"1px solid #e8e9ed",padding:16,overflow:"auto"}}>
+                <div style={{fontSize:16,fontWeight:600,marginBottom:12}}>스토어</div>
+                {selectedProducts.map(pid=>{const p=PRODUCTS.find(x=>x.id===pid);return p&&(<div key={pid} style={{display:"flex",gap:10,padding:"10px 0",borderBottom:"1px solid #f0f0f0"}}><span style={{fontSize:28}}>{p.img}</span><div><div style={{fontSize:14,fontWeight:600}}>{p.name}</div><div style={{fontSize:13,color:"#6e6e73"}}>{p.price}</div></div></div>);})}
+              </div>
+              <div style={{width:320,display:"flex",flexDirection:"column",gap:12}}>
+                <div style={{flex:1,background:"#fff",borderRadius:12,border:"1px solid #e8e9ed",padding:16,display:"flex",flexDirection:"column"}}>
+                  <div style={{fontSize:16,fontWeight:600,marginBottom:12}}>채팅</div>
+                  <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}}><p style={{fontSize:13,color:"#8b8b8f",textAlign:"center"}}>{isLive?"채팅 활성화됨":"방송 시작 후 활성화"}</p></div>
+                </div>
+                <div style={{height:150,background:"#fff",borderRadius:12,border:"1px solid #e8e9ed",padding:16}}>
+                  <div style={{fontSize:16,fontWeight:600,marginBottom:8}}>메모</div>
+                  <textarea value={memo} onChange={e=>setMemo(e.target.value.slice(0,100))} placeholder="메모" style={{width:"100%",height:60,background:"#f7f8fa",borderRadius:6,border:"none",outline:"none",padding:8,fontSize:13,resize:"none",fontFamily:"inherit",boxSizing:"border-box"}} />
+                  <div style={{textAlign:"right",fontSize:11,color:"#8b8b8f"}}>{memo.length}/100</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return(
+    <div style={{display:"flex",height:"100vh",fontSize:14,color:"#1a1a1a"}}>
+      <Sidebar/>
+      {screen==="idle"&&<Idle/>}
+      {screen==="prepare"&&<Prepare/>}
+      {screen==="dashboard"&&<Dashboard/>}
+      {aiScreen==="input"&&<AiInput/>}
+      {aiScreen==="generating"&&<AiGenerating/>}
+      {aiScreen==="results"&&<AiResults/>}
+      {confirmType==="start"&&<ConfirmDialog icon="🔴" title="방송을 시작할까요?" desc="시작하면 시청자에게 방송됩니다." confirmLabel="시작" confirmColor={broadcastMode==="live"?"#FF3B30":"#FF9500"} onConfirm={()=>{setConfirmType(null);setIsLive(true);}} onCancel={()=>setConfirmType(null)}/>}
+      {confirmType==="end"&&<ConfirmDialog icon="⏹️" title="방송을 종료할까요?" desc="시청자 연결이 끊어집니다." confirmLabel="종료" confirmColor="#FF3B30" onConfirm={()=>{setConfirmType(null);setIsLive(false);}} onCancel={()=>setConfirmType(null)}/>}
+    </div>
+  );
+}
+
+ReactDOM.render(<App/>, document.getElementById("root"));
+</script>
+</body>
+</html>
